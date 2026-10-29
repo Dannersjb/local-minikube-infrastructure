@@ -1,0 +1,111 @@
+---
+- name: Initialise Kubernetes control plane
+  hosts: control_plane
+  become: true
+  tasks:
+    - name: Initialise the control plane
+      ansible.builtin.command:
+        argv:
+          - kubeadm
+          - init
+          - "--apiserver-advertise-address={{ ansible_host }}"
+          - "--pod-network-cidr=10.244.0.0/16"
+      args:
+        creates: /etc/kubernetes/admin.conf
+
+    - name: Create kubeconfig directory for terraform user
+      ansible.builtin.file:
+        path: /home/terraform/.kube
+        state: directory
+        owner: terraform
+        group: terraform
+        mode: "0755"
+
+    - name: Copy admin kubeconfig
+      ansible.builtin.copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/terraform/.kube/config
+        remote_src: true
+        owner: terraform
+        group: terraform
+        mode: "0600"
+
+    - name: Install Flannel pod network
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig=/etc/kubernetes/admin.conf
+          - apply
+          - -f
+          - https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
+      register: flannel_apply
+      changed_when: "'created' in flannel_apply.stdout or 'configured' in flannel_apply.stdout"
+
+    - name: Wait for control plane to become Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig=/etc/kubernetes/admin.conf
+          - wait
+          - --for=condition=Ready
+          - nodes
+          - --all
+          - --timeout=180s
+      changed_when: false
+
+    - name: Generate worker join command
+      ansible.builtin.command:
+        argv:
+          - kubeadm
+          - token
+          - create
+          - --print-join-command
+      register: join_command
+      changed_when: false
+      no_log: true
+
+    - name: Store worker join command for this run
+      ansible.builtin.set_fact:
+        kubeadm_join_command: "{{ join_command.stdout }}"
+      no_log: true
+
+- name: Join worker nodes
+  hosts: workers
+  become: true
+  tasks:
+    - name: Join cluster if not already joined
+      ansible.builtin.command: "{{ hostvars[groups['control_plane'][0]].kubeadm_join_command }}"
+      args:
+        creates: /etc/kubernetes/kubelet.conf
+
+- name: Verify Kubernetes cluster
+  hosts: control_plane
+  become: true
+  tasks:
+    - name: Wait for all nodes to become Ready
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig=/etc/kubernetes/admin.conf
+          - wait
+          - --for=condition=Ready
+          - nodes
+          - --all
+          - --timeout=300s
+      changed_when: false
+
+    - name: Display cluster nodes
+      ansible.builtin.command:
+        argv:
+          - kubectl
+          - --kubeconfig=/etc/kubernetes/admin.conf
+          - get
+          - nodes
+          - -o
+          - wide
+      register: cluster_nodes
+      changed_when: false
+
+    - name: Show cluster status
+      ansible.builtin.debug:
+        var: cluster_nodes.stdout_lines

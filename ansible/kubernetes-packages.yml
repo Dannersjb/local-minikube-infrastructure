@@ -1,0 +1,68 @@
+---
+- name: Install Kubernetes packages
+  hosts: kubernetes
+  become: true
+
+  vars:
+    kubernetes_minor_version: "v1.36"
+
+  tasks:
+    - name: Install repository prerequisites
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gpg
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create APT keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Download Kubernetes repository signing key
+      ansible.builtin.shell:
+        cmd: >-
+          curl -fsSL
+          https://pkgs.k8s.io/core:/stable:/{{ kubernetes_minor_version }}/deb/Release.key
+          | gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    - name: Set Kubernetes signing key permissions
+      ansible.builtin.file:
+        path: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Configure Kubernetes APT repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/kubernetes.list
+        content: |
+          deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/{{ kubernetes_minor_version }}/deb/ /
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Install kubelet, kubeadm and kubectl
+      ansible.builtin.apt:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: present
+        update_cache: true
+
+    - name: Hold Kubernetes package versions
+      ansible.builtin.dpkg_selections:
+        name: "{{ item }}"
+        selection: hold
+      loop:
+        - kubelet
+        - kubeadm
+        - kubectl
