@@ -1,13 +1,11 @@
-#
+# Local Kubernetes Cluster Setup
 
 1. Install terraform
 2. run `ssh-key-generation.sh`
 3. `cd local-kubernetes-infrastructure/terraform`
-   `terraform init`
-   `terraform fmt`
-   `terraform validate`
-   `terraform plan`
-   `terraform apply`
+4. `terraform apply`
+5. `cd ..`
+6. `ansible-playbook -i ansible/inventory.ini ansible/site.yml`
 
 # to do
 
