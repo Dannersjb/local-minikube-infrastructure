@@ -9,9 +9,6 @@
 
 # to do
 
-- Create an Ansible playbook to configure libvirt on the host
-- Install KVM/libvirt dependencies
-- Ensure libvirt services are running
 - Create and configure the Kubernetes lab storage pool
 - Create and configure the libvirt virtual network
 - Enable pool and network autostart
