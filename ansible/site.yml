@@ -13,3 +13,9 @@
 
 - name: Initialise the Kubernetes cluster
   ansible.builtin.import_playbook: playbooks/cluster.yml
+
+- name: Install Helm
+  ansible.builtin.import_playbook: playbooks/helm.yml
+
+- name: Install Argo CD
+  ansible.builtin.import_playbook: playbooks/argocd.yml

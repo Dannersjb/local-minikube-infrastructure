@@ -1,0 +1,47 @@
+---
+- name: Install Helm on the control plane
+  hosts: control_plane
+  become: true
+
+  tasks:
+    - name: Install Helm prerequisites
+      ansible.builtin.apt:
+        name:
+          - curl
+          - gpg
+        state: present
+        update_cache: true
+
+    - name: Download Helm signing key
+      ansible.builtin.get_url:
+        url: https://packages.buildkite.com/helm-linux/helm-debian/gpgkey
+        dest: /tmp/helm.asc
+        mode: "0644"
+
+    - name: Install Helm signing key
+      ansible.builtin.copy:
+        src: /tmp/helm.asc
+        dest: /etc/apt/keyrings/helm.asc
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Configure Helm APT repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/helm-stable-debian.sources
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          Types: deb
+          URIs: https://packages.buildkite.com/helm-linux/helm-debian/any/
+          Suites: any
+          Components: main
+          Signed-By: /etc/apt/keyrings/helm.asc
+
+    - name: Install Helm
+      ansible.builtin.apt:
+        name: helm
+        state: present
+        update_cache: true

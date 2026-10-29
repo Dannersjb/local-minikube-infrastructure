@@ -1,0 +1,32 @@
+---
+- name: Install Argo CD
+  hosts: control_plane
+  become: true
+
+  tasks:
+    - name: Add the Argo Helm repository
+      kubernetes.core.helm_repository:
+        name: argo
+        repo_url: https://argoproj.github.io/argo-helm
+      become: false
+      become_user: terraform
+
+    - name: Install or upgrade Argo CD
+      kubernetes.core.helm:
+        name: argocd
+        chart_ref: argo/argo-cd
+        release_namespace: argocd
+        create_namespace: true
+        state: present
+        wait: true
+        wait_timeout: 600s
+        values:
+          server:
+            service:
+              type: NodePort
+              nodePortHttp: 30080
+              nodePortHttps: 30443
+      become: false
+      become_user: terraform
+      environment:
+        KUBECONFIG: /home/terraform/.kube/config
