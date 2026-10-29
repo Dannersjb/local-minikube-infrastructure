@@ -1,0 +1,15 @@
+---
+- name: Install base utilities
+  ansible.builtin.import_playbook: playbooks/setup.yml
+
+- name: Configure Kubernetes prerequisites
+  ansible.builtin.import_playbook: playbooks/kubernetes-prerequisites.yml
+
+- name: Install containerd
+  ansible.builtin.import_playbook: playbooks/containerd.yml
+
+- name: Install Kubernetes packages
+  ansible.builtin.import_playbook: playbooks/kubernetes-packages.yml
+
+- name: Initialise the Kubernetes cluster
+  ansible.builtin.import_playbook: playbooks/cluster.yml
