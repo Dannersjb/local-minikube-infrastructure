@@ -1,0 +1,19 @@
+---
+- name: Prepare Kubernetes nodes
+  hosts: kubernetes
+  become: true
+
+  tasks:
+    - name: Update apt package cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install prerequisite packages
+      ansible.builtin.apt:
+        name:
+          - curl
+          - ca-certificates
+          - gpg
+          - apt-transport-https
+        state: present

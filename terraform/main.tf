@@ -20,29 +20,13 @@ locals {
   ubuntu_image_url = "https://cloud-images.ubuntu.com/noble/current/noble-server-cloudimg-amd64.img"
 }
 
-# Download the base Ubuntu cloud image once.
-resource "libvirt_volume" "ubuntu_base" {
-  name = "ubuntu-noble-base.qcow2"
-  pool = "default"
-  target = {
-    format = {
-      type = "qcow2"
-    }
-  }
-
-  create = {
-    content = {
-      url = local.ubuntu_image_url
-    }
-  }
-}
-
-# Create a separate writable disk for each node.
+# One independent Ubuntu disk per VM.
 resource "libvirt_volume" "node_disk" {
   for_each = local.nodes
 
   name = "${each.key}.qcow2"
   pool = "default"
+
   target = {
     format = {
       type = "qcow2"
@@ -51,17 +35,14 @@ resource "libvirt_volume" "node_disk" {
 
   capacity = each.value.disk * 1024 * 1024 * 1024
 
-  backing_store = {
-    path = libvirt_volume.ubuntu_base.path
-    target = {
-      format = {
-        type = "qcow2"
-      }
+  create = {
+    content = {
+      url = local.ubuntu_image_url
     }
   }
 }
 
-# Generate cloud-init configuration for each VM.
+# Cloud-init configuration for each VM.
 resource "libvirt_cloudinit_disk" "node_init" {
   for_each = local.nodes
 
@@ -78,17 +59,12 @@ resource "libvirt_cloudinit_disk" "node_init" {
   })
 }
 
-# Import each cloud-init image into the libvirt storage pool.
+# Store each cloud-init ISO in libvirt.
 resource "libvirt_volume" "node_init_iso" {
   for_each = local.nodes
 
   name = "${each.key}-cloudinit.iso"
   pool = "default"
-  target = {
-    format = {
-      type = "iso"
-    }
-  }
 
   create = {
     content = {
@@ -99,7 +75,7 @@ resource "libvirt_volume" "node_init_iso" {
   depends_on = [libvirt_cloudinit_disk.node_init]
 }
 
-# Create the VMs.
+# Three Ubuntu VMs.
 resource "libvirt_domain" "node" {
   for_each = local.nodes
 
@@ -108,6 +84,7 @@ resource "libvirt_domain" "node" {
   memory      = each.value.memory
   memory_unit = "MiB"
   vcpu        = each.value.vcpu
+  running     = true
 
   os = {
     type         = "hvm"
@@ -115,9 +92,7 @@ resource "libvirt_domain" "node" {
     type_machine = "q35"
 
     boot_devices = [
-      {
-        dev = "hd"
-      }
+      { dev = "hd" }
     ]
   }
 
@@ -125,8 +100,8 @@ resource "libvirt_domain" "node" {
     disks = [
       {
         driver = {
-           name = "qemu"
-           type = "qcow2"
+          name = "qemu"
+          type = "qcow2"
         }
         source = {
           volume = {
@@ -165,9 +140,15 @@ resource "libvirt_domain" "node" {
         model = {
           type = "virtio"
         }
-        wait_for_ip = {
-          timeout = 300
-          source  = "lease"
+      }
+    ]
+
+    consoles = [
+      {
+        type = "pty"
+        target = {
+          type = "serial"
+          port = 0
         }
       }
     ]
